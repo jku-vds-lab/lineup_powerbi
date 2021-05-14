@@ -34,5 +34,6 @@
       "url": "./.api/v1.10.0/schema.dependencies.json"
     }
   ],
-  "files.trimTrailingWhitespace": true
+  "files.trimTrailingWhitespace": true,
+  "editor.rulers": [80]
 }

@@ -1,5 +1,5 @@
 {
-  "name": "lineup_powerbi",
+  "name": "visual",
   "description": "LineUp is an interactive technique designed to create, visualize and explore rankings of items based on a set of heterogeneous attributes.",
   "private": true,
   "version": "1.0.0",
@@ -7,6 +7,17 @@
     "name": "Samuel Gratzl",
     "email": "sam@sgratzl.com"
   },
+  "contributors": [
+    {
+      "name": "Vaishali Dhanoa"
+    },
+    {
+      "name": "Conny Walchshofer"
+    },
+    {
+      "name": "Holger Stitz"
+    }
+  ],
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/lineupjs/lineup_powerbi/issues"
@@ -17,17 +28,25 @@
   },
   "homepage": "https://github.com/lineupjs/lineup_powerbi",
   "scripts": {
-    "start": "pbiviz start"
+    "pbiviz": "pbiviz",
+    "start": "pbiviz start",
+    "package": "pbiviz package",
+    "lint": "tslint -r \"node_modules/tslint-microsoft-contrib\"  \"+(src|test)/**/*.ts\""
   },
   "dependencies": {
-    "lineupjs": "^3.1.5",
-    "powerbi-visuals-utils-dataviewutils": "^1.4.1"
+    "@babel/runtime": "^7.14.0",
+    "@babel/runtime-corejs2": "^7.14.0",
+    "@types/d3": "6.3.0",
+    "core-js": "3.12.1",
+    "d3": "6.7.0",
+    "fast-deep-equal": "^3.1.3",
+    "lineupjs": "^4.2.0",
+    "powerbi-visuals-api": "~2.6.0",
+    "powerbi-visuals-utils-dataviewutils": "^2.4.1",
+    "tslib": "^2.2.0"
   },
   "devDependencies": {
-    "powerbi-visuals-tools": "^2.1.1",
-    "tslint": "^5.11.0",
-    "tslint-consistent-codestyle": "^1.13.3",
-    "tslint-eslint-rules": "^5.4.0",
-    "typescript": "^3.1.3"
+    "ts-loader": "9.1.2",
+    "typescript": "4.2.4"
   }
 }
