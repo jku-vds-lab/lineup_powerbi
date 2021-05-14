@@ -218,57 +218,77 @@ export class Visual implements IVisual {
     this.visualUpdateOptions_ = options;
 
     let removedColumns: any[] = [];
+
+    // save old settings
     const oldSettings = this.settings;
+
+    // parse new settings
     this.settings = Visual.parseSettings(
                       options && options.dataViews && options.dataViews[0]
                     );
 
     let providerChanged = false;
 
+    // check rows and columns from powerbi table dataview
     let { rows, cols } = this.extract(options.dataViews[0].table!);
 
+    // get old data
     let { oldRows, oldCols } = this.getOldData();
 
+    // check against old data if new data has really changed?
     this.hasDataChanged = !(rows === oldRows && cols === oldCols);
 
+    // if provider has not been initialized
     if (!this.provider || !this.equalObject(
                             oldSettings.provider,
                             this.settings.provider
                           )
     ) {
+      // create a new localdata provider from lineup
       this.provider = new LocalDataProvider(rows, cols, this.settings.provider);
 
+      // derive a default ranking
       this.provider.deriveDefault();
       providerChanged = true;
     }
+    // if the provider is already present and then the data has changed
     else if (this.hasDataChanged && options.type == VisualUpdateType.Data) {
 
+      // if new cols have been added
       if (cols.length >= oldCols.length) {
         let flag = true;
 
         cols.forEach((c: any) => {
           flag = true;
           this.state.forEach((s: any) => {
+            // compare label due to lack of missing key identifier
             if (c.label === s.label) {
                 flag = false;
             }
           })
           if (flag) {
+            // push the column in the current state of the visual, if the
+            // column is new
             this.state.push(c);
           }
         });
       }
       else {
+        // otherwise remove the column
         removedColumns = this.removeColumnPBI(cols);
       }
 
+      // clear all the columns from the provider
       this.provider.clearColumns();
 
       this.state.forEach((c: any) => {
+        // push all the new columns
         this.provider.pushDesc(c);
       });
 
+      // set data for all the updated rows
       this.provider.setData(rows);
+      // set a default rank
       this.provider.deriveDefault();
     }
 
@@ -277,6 +297,7 @@ export class Visual implements IVisual {
                           this.settings.lineup
                         )
     ) {
+      // initialize lineup
       this.lineup = new LineUp(
         <HTMLElement>this.target.firstElementChild!,
         this.provider,
@@ -284,6 +305,7 @@ export class Visual implements IVisual {
       );
     }
     else if (providerChanged) {
+      // set the data provider if lineup is already initialized
       this.lineup.setDataProvider(this.provider);
     }
     else {
@@ -291,7 +313,9 @@ export class Visual implements IVisual {
     }
 
     if (this.lineup) {
+      // get lineup ranking
       this.ranking = this.lineup.data.getLastRanking();
+      // handle all the event listeners
       this.handleEventListeners(rows, cols);
     }
 
@@ -406,6 +430,7 @@ export class Visual implements IVisual {
       this.storeSortCriteria();
     });
 
+    // Remove the column from state and update it. and also remove it from cols?
     this.ranking.on(Ranking.EVENT_REMOVE_COLUMN, (
       col: Column,
       index: number
@@ -615,7 +640,8 @@ export class Visual implements IVisual {
         column: d.index
       };
 
-      if (!d.type || d.roles!.row) { // row identifer are always strings
+      // row identifer are always strings
+      if (!d.type || d.roles!.row) {
         c.type = 'string';
       }
       else if (d.type.bool) {
