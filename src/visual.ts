@@ -68,49 +68,49 @@ import { IDataProviderDump } from "lineupjs/src/provider/interfaces";
 export class Visual implements IVisual {
 
   /**
-  * root Element
+  * root Element to hook
   */
   private readonly target: HTMLElement;
 
 
   /**
-  *
+  * PowerBi color palette
   */
   private readonly colorPalette: IColorPalette;
 
 
   /**
-  * data provider based on an local array
+  * data provider based on an local array holding the data and rankings
   */
   private provider: LocalDataProvider;
 
 
   /**
-  *
+  * The lineup object - creates the lineUp visual
   */
   private lineup: LineUp;
 
 
   /**
-  *
+  * Holds the lineup and provider settings
   */
   private settings: LineUpVisualSettings;
 
 
   /**
-  *
+  * holds the coloring index of the lineup visual columns
   */
   private colorIndex = 0;
 
 
   /**
-  * Catches the events
+  * Holds the actual ranking of the lineUp visual - Catches the events
   */
   private ranking: Ranking;
 
 
   /**
-  *
+  * Holds the actual state of the PowerBi
   */
   private state: Array<any>;
 
@@ -159,15 +159,22 @@ export class Visual implements IVisual {
 
 
   /**
-  * stores options of the update
+  * stores options of PowerBi update
   */
   private visualUpdateOptions_: VisualUpdateOptions;
+
+
+  /**
+  * Storage Key
+  */
+  private storageKey:string = "LINEUP_STORAGE_KEY";
 
 
   /**
   *
   */
   //private visualSettings:
+
 
   /**
   * Creates instance of BarChart. This method is only called once.
@@ -183,6 +190,7 @@ export class Visual implements IVisual {
     this.state = new Array<any>();
     this.colorPalette = options.host.colorPalette;
     this.target = options.element;
+    // Todo Change this
     this.target.innerHTML = '<div></div>';
     this.settings = new LineUpVisualSettings();
     this.hasDataChanged = false;
@@ -191,11 +199,14 @@ export class Visual implements IVisual {
 
     this.localStorage = options.host.storageService;
 
-    this.localStorage.get("sortCriteria").then(sortCriteria => {
-      this.updateCriterias(sortCriteria);
+    //this.localStorage.remove(this.storageKey);
+
+    this.localStorage.get(this.storageKey).then(criteria => {
+      this.updateCriterias(criteria);
     })
     .catch(() => {
 
+      this.criteriaLoadingfinished = true;
       console.log("Error no storage available");
     });
   }
@@ -216,7 +227,6 @@ export class Visual implements IVisual {
   update(options: VisualUpdateOptions) {
 
     this.visualUpdateOptions_ = options;
-
     let removedColumns: any[] = [];
 
     // save old settings
@@ -229,7 +239,7 @@ export class Visual implements IVisual {
 
     let providerChanged = false;
 
-    // check rows and columns from powerbi table dataview
+    // gets rows and columns from powerbi table dataview
     let { rows, cols } = this.extract(options.dataViews[0].table!);
 
     // get old data
@@ -256,22 +266,7 @@ export class Visual implements IVisual {
 
       // if new cols have been added
       if (cols.length >= oldCols.length) {
-        let flag = true;
-
-        cols.forEach((c: any) => {
-          flag = true;
-          this.state.forEach((s: any) => {
-            // compare label due to lack of missing key identifier
-            if (c.label === s.label) {
-                flag = false;
-            }
-          })
-          if (flag) {
-            // push the column in the current state of the visual, if the
-            // column is new
-            this.state.push(c);
-          }
-        });
+        this.addColumn(cols);
       }
       else {
         // otherwise remove the column
@@ -303,7 +298,7 @@ export class Visual implements IVisual {
         this.provider,
         this.settings.lineup
       );
-    }
+     }
     else if (providerChanged) {
       // set the data provider if lineup is already initialized
       this.lineup.setDataProvider(this.provider);
@@ -320,93 +315,14 @@ export class Visual implements IVisual {
     }
 
     if (this.groupCriteria.length > 0) {
-      let indexToBeRemoved = -1;
-
-      this.groupCriteria.forEach((g: any) => {
-        removedColumns.forEach((c: any) => {
-          if (c.label == g.label) {
-              indexToBeRemoved = this.groupCriteria.indexOf(g);
-          }
-        });
-      });
-
-      if (indexToBeRemoved >= 0) {
-        this.groupCriteria.splice(indexToBeRemoved, 1);
-      }
-
-      if (this.groupCriteria.length > 0) {
-        this.ranking.setGroupCriteria(this.groupCriteria);
-        this.ranking.setGroupSortCriteria(this.groupSortCriteria);
-      }
+      this.handleGruopCriteria(removedColumns);
     }
 
     if (this.filterInfo.length > 0) {
-      let indexToBeRemoved = -1;
-      removedColumns.forEach((c: Column) => {
-          for (let i = 0; i < this.filterInfo.length; i++) {
-              if (this.filterInfo[i].colName == c.label) {
-                  indexToBeRemoved = i;
-              }
-          }
-      });
-
-      if (indexToBeRemoved >= 0) {
-          this.filterInfo.splice(indexToBeRemoved, 1);
-      }
-
-      if (this.filterInfo.length > 0) {
-        this.ranking.children.forEach((c: Column) => {
-          this.filterInfo.forEach((f: any) => {
-            if (c.desc.type == "number" && c.label == f.colName) {
-              (<NumberColumn>c).setFilter(f.filter);
-            }
-          })
-        });
-      }
+      this.handleFilterChange(removedColumns);
     }
-  }
 
-
-  /**
-  * Stores the current lineUp stat in localStorage
-  *
-  * @function
-  * @param -
-  */
-  private storeSortCriteria() {
-    if(!this.criteriaLoadingfinished)
-      return;
-
-    let dump:string = "";
-    dump = JSON.stringify(this.provider.dump());
-    dump = this.clearString(dump);
-
-    this.localStorage.set("sortCriteria", dump);
-  }
-
-
-  /**
-  * Updates the last saved state of lineUp - called only once at start
-  *
-  * @function
-  * @param -
-  */
-  private updateCriterias(criteria: string) {
-
-    if(typeof(criteria) == "undefined" || criteria == "undefined" || criteria == "")
-      return;
-
-    let cleanedCriteria:string = this.clearString(criteria);
-
-    let dump:IDataProviderDump = JSON.parse(cleanedCriteria);
-
-    this.lineup.setDataProvider(this.provider, dump);
-    this.lineup.update();
-    this.ranking = this.lineup.data.getLastRanking();
-    let { rows, cols } = this.extract(this.visualUpdateOptions_.dataViews[0].table!);
-    this.handleEventListeners(rows, cols);
-
-    this.criteriaLoadingfinished = true;
+    this.storeSortCriteria();
   }
 
 
@@ -419,14 +335,44 @@ export class Visual implements IVisual {
   */
   private handleEventListeners(rows: any[], cols: any[]) {
 
-    this.ranking.on(Ranking.EVENT_MOVE_COLUMN, (
-      col: Column,
-      index: number,
-      oldIndex: number
+    this.ranking.on(Ranking.EVENT_WIDTH_CHANGED, (
+      previous: number,
+      current: number) =>
+    {
+      this.storeSortCriteria();
+    });
+
+    this.ranking.on(Ranking.EVENT_FILTER_CHANGED, (
+      previous: INumberFilter,
+      current: INumberFilter
     ) => {
-      this.state.length = 0;
-      this.ranking.children.slice(3, this.ranking.children.length)
-                           .forEach((c: Column) => this.state.push(c.desc));
+      this.ranking.children.forEach((c: Column) => {
+        if (c.isFiltered()) {
+            this.filterInfo.push({ filter: current, colName: c.label });
+        }
+      });
+      this.storeSortCriteria();
+    })
+
+    this.ranking.on(Ranking.EVENT_LABEL_CHANGED, (
+      previous: string,
+      current: string) =>
+    {
+      this.storeSortCriteria();
+    });
+
+    //Handled already within group criteria
+    this.ranking.on(Ranking.EVENT_GROUPS_CHANGED, (
+      previous: string,
+      current: string) =>
+    {
+      //this.storeSortCriteria();
+     });
+
+    this.ranking.on(Ranking.EVENT_ADD_COLUMN, (
+      previous: string,
+      current: string) =>
+    {
       this.storeSortCriteria();
     });
 
@@ -436,26 +382,8 @@ export class Visual implements IVisual {
       index: number
     ) => {
       // Remove the column from state and update it. and also remove it from cols?
-      this.storeSortCriteria();
-    });
-
-    this.ranking.on(Ranking.EVENT_SORT_CRITERIA_CHANGED, (
-      previous: number,
-      current: number
-    ) => {
-      this.sortCriteria = this.ranking.getSortCriteria();
-      this.storeSortCriteria();
-    });
-
-    //Handled already within group criteria
-    this.ranking.on(Ranking.EVENT_GROUPS_CHANGED, (
-      previous: number[],
-      current: number[],
-      previousGroups: IOrderedGroup[],
-      currentGroups: IOrderedGroup[]
-    ) => {
-      this.storeSortCriteria();
-    });
+      //this.storeSortCriteria();
+      });
 
     this.ranking.on(Ranking.EVENT_GROUP_CRITERIA_CHANGED, (
       previous: Column[],
@@ -469,6 +397,7 @@ export class Visual implements IVisual {
             groupedColumn = c;
             if (g.label == c.label) {
                 groupedColumn = null;
+                this.storeSortCriteria();
                 return;
             }
           })
@@ -484,7 +413,45 @@ export class Visual implements IVisual {
         });
       }
 
+      this.storeSortCriteria();
+    });
 
+    this.ranking.on(Ranking.EVENT_MOVE_COLUMN, (
+      col: Column,
+      index: number,
+      oldIndex: number
+    ) => {
+      this.state.length = 0;
+      this.ranking.children.slice(3, this.ranking.children.length)
+                           .forEach((c: Column) => this.state.push(c.desc));
+      this.storeSortCriteria();
+    });
+
+    this.ranking.on(Ranking.EVENT_DIRTY, (
+      previous: string,
+      current: string) =>
+    {
+      this.storeSortCriteria();
+    });
+
+    this.ranking.on(Ranking.EVENT_DIRTY_HEADER, (
+      previous: string,
+      current: string) =>
+    {
+      //this.storeSortCriteria();
+    });
+
+    this.ranking.on(Ranking.EVENT_DIRTY_VALUES, (
+      previous: string,
+      current: string) =>
+    {
+      //this.storeSortCriteria();
+    });
+
+    this.ranking.on(Ranking.EVENT_DIRTY_CACHES, (
+      previous: string,
+      current: string) =>
+    {
       this.storeSortCriteria();
     });
 
@@ -500,6 +467,7 @@ export class Visual implements IVisual {
             gSortCriteria = c;
             if (g.col.label == c.col.label) {
               gSortCriteria = null;
+              this.storeSortCriteria();
               return;
             }
           })
@@ -517,35 +485,51 @@ export class Visual implements IVisual {
       this.storeSortCriteria();
     });
 
-    this.ranking.on(Ranking.EVENT_FILTER_CHANGED, (
-      previous: INumberFilter,
-      current: INumberFilter
-    ) => {
-      this.ranking.children.forEach((c: Column) => {
-        if (c.isFiltered()) {
-            this.filterInfo.push({ filter: current, colName: c.label });
-        }
-      });
+    this.ranking.on(Ranking.EVENT_COLUMN_VISIBILITY_CHANGED, (
+      previous: string,
+      current: string) =>
+    {
       this.storeSortCriteria();
-    })
+    });
 
-    this.ranking.on(Ranking.EVENT_WIDTH_CHANGED, (
+    this.ranking.on(Ranking.EVENT_SORT_CRITERIA_CHANGED, (
       previous: number,
-      current: number) =>
-    {
+      current: number
+    ) => {
+      //this.sortCriteria = this.ranking.getSortCriteria();
       this.storeSortCriteria();
     });
 
-    this.ranking.on(Ranking.EVENT_LABEL_CHANGED, (
+    this.ranking.on(Ranking.EVENT_DIRTY_ORDER, (
       previous: string,
       current: string) =>
     {
       this.storeSortCriteria();
     });
 
-    this.ranking.on(Ranking.EVENT_GROUPS_CHANGED, (
+    this.ranking.on(Ranking.EVENT_ORDER_CHANGED, (
       previous: string,
       current: string) =>
+    {
+      //this.storeSortCriteria();
+    });
+
+    this.lineup.on(LineUp.EVENT_SELECTION_CHANGED, () =>
+    {
+      this.storeSortCriteria();
+    });
+
+    this.lineup.on(LineUp.EVENT_DIALOG_OPENED, () =>
+    {
+      this.storeSortCriteria();
+    });
+
+    this.lineup.on(LineUp.EVENT_DIALOG_CLOSED, () =>
+    {
+      this.storeSortCriteria();
+    });
+
+    this.lineup.on(LineUp.EVENT_HIGHLIGHT_CHANGED, () =>
     {
       this.storeSortCriteria();
     });
@@ -570,10 +554,157 @@ export class Visual implements IVisual {
 
 
   /**
+  * Adds the given column to the visual
   *
+  * @param { any[] } cols - actual columns of the visuals
+  */
+  private addColumn(cols:any[])
+  {
+    let flag = true;
+
+    cols.forEach((c: any) => {
+      flag = true;
+      this.state.forEach((s: any) => {
+        // compare label due to lack of missing key identifier
+        if (c.label === s.label) {
+            flag = false;
+        }
+      })
+      if (flag) {
+        // push the column in the current state of the visual, if the
+        // column is new
+        this.state.push(c);
+      }
+    });
+  }
+
+
+  /**
+  * Sets the changed groupCriteria
+  *
+  * @param { any[] } removedColumns - Array of removed columns
+  */
+  private handleGruopCriteria(removedColumns:any[])
+  {
+    let indexToBeRemoved = -1;
+
+    this.groupCriteria.forEach((g: any) => {
+      removedColumns.forEach((c: any) => {
+        if (c.label == g.label) {
+            indexToBeRemoved = this.groupCriteria.indexOf(g);
+        }
+      });
+    });
+
+    if (indexToBeRemoved >= 0) {
+      this.groupCriteria.splice(indexToBeRemoved, 1);
+    }
+
+    if (this.groupCriteria.length > 0) {
+      this.ranking.setGroupCriteria(this.groupCriteria);
+      this.ranking.setGroupSortCriteria(this.groupSortCriteria);
+    }
+  }
+
+
+  /**
+  * Sets the filter changes
+  *
+  * @param { any[] } removedColumns - Array of removed columns
+  */
+  private handleFilterChange(removedColumns:any[])
+  {
+    let indexToBeRemoved = -1;
+    removedColumns.forEach((c: Column) => {
+        for (let i = 0; i < this.filterInfo.length; i++) {
+            if (this.filterInfo[i].colName == c.label) {
+                indexToBeRemoved = i;
+            }
+        }
+    });
+
+    if (indexToBeRemoved >= 0) {
+        this.filterInfo.splice(indexToBeRemoved, 1);
+    }
+
+    if (this.filterInfo.length > 0) {
+      this.ranking.children.forEach((c: Column) => {
+        this.filterInfo.forEach((f: any) => {
+          if (c.desc.type == "number" && c.label == f.colName) {
+            (<NumberColumn>c).setFilter(f.filter);
+          }
+        })
+      });
+    }
+  }
+
+
+  /**
+  * Stores the current lineUp stat in localStorage
   *
   * @function
-  * @param
+  * @param -
+  */
+  private storeSortCriteria() {
+
+    // Wait for inital restore of the state
+    if(!this.criteriaLoadingfinished)
+      return;
+
+    // create LineUp dump and convert it to string
+    let dump:string = "";
+
+    dump = JSON.stringify(this.lineup.dump());
+    dump = this.clearString(dump);
+
+    // save the dump
+    this.localStorage.set(this.storageKey, dump);
+  }
+
+
+  /**
+  * Updates the last saved state of lineUp - called only once at start
+  *
+  * @function
+  * @param { string } criteria - state value from the PowerBi local storage
+  */
+  private updateCriterias(criteria: string) {
+
+    // If no criteria return
+    if(typeof(criteria) == "undefined" || criteria == "undefined" || criteria == "")
+    {
+      this.criteriaLoadingfinished = true;
+      return;
+    }
+
+    let cleanedCriteria:string = this.clearString(criteria);
+
+    // Create dump for restore
+    let dump:IDataProviderDump = JSON.parse(cleanedCriteria);
+
+    // set dump to the provider and update lineup
+    try {
+      this.lineup.restore(dump);
+    }
+    catch (e){
+      console.log("Error e: " + e);
+    }
+
+    // recreate ranking and set event listeners again
+    this.ranking = this.lineup.data.getLastRanking();
+    let { rows, cols } = this.extract(this.visualUpdateOptions_.dataViews[0].table!);
+    this.handleEventListeners(rows, cols);
+
+    // Enable saving new state
+    this.criteriaLoadingfinished = true;
+  }
+
+
+  /**
+  * Removes a column from the lineup visual
+  *
+  * @function
+  * @param { any[] } cols - columns of actual visual
   */
   private removeColumnPBI(cols: any[]) {
 
@@ -605,7 +736,7 @@ export class Visual implements IVisual {
 
 
   /**
-  *
+  * Returns actual rows and columns of the PowerBi
   *
   * @function
   * @param
@@ -624,10 +755,10 @@ export class Visual implements IVisual {
 
 
   /**
-  *
+  * Extracts rows and columns of the PowerBi table
   *
   * @function
-  * @param
+  * @param { DataViewTable } table - Actual PowerBi data table
   */
   private extract(table: DataViewTable) {
 
@@ -685,10 +816,12 @@ export class Visual implements IVisual {
 
 
   /**
-  *
+  * Checks if two given objects are the same - returns true if the objects are
+  * the same.
   *
   * @function
-  * @param
+  * @param { any } a
+  * @param { any } b
   */
   private equalObject(a: any, b: any) {
     if (a === b) {
@@ -711,10 +844,10 @@ export class Visual implements IVisual {
 
 
   /**
-  *
+  * Parses PowerBi settings to LineUp settings and returns them
   *
   * @function
-  * @param
+  * @param { DataView } dataView - Represents views of a data set.
   */
   private static parseSettings(dataView: DataView): LineUpVisualSettings {
     return <LineUpVisualSettings>LineUpVisualSettings.parse(dataView);
@@ -749,7 +882,7 @@ export class Visual implements IVisual {
 
 
   /**
-  * Deletes not needed characters
+  * Deletes not needed characters for parse/stringify JSON
   *
   * @function
   * @param { string } inputStr
