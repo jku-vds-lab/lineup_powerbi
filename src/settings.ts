@@ -29,11 +29,20 @@
 import { dataViewObjectsParser } from "powerbi-visuals-utils-dataviewutils";
 import DataViewObjectsParser = dataViewObjectsParser.DataViewObjectsParser;
 
+
+/**
+ *
+*/
 export class LineUpVisualSettings extends DataViewObjectsParser {
-  readonly lineup = new LineUpSettings();
-  readonly provider = new LineUpProviderSettings();
+  public dump: DumpSettings = new DumpSettings();
+  public provider: LineUpProviderSettings = new LineUpProviderSettings();
+  public lineup: LineUpSettings = new LineUpSettings();
 }
 
+
+/**
+ *
+*/
 export class LineUpProviderSettings {
   filterGlobally: boolean;
   maxNestedSortingCriteria: number;
@@ -41,6 +50,10 @@ export class LineUpProviderSettings {
   multiSelection: boolean;
 }
 
+
+/**
+ *
+*/
 export class LineUpSettings {
   overviewMode: boolean;
   summaryHeader: boolean;
@@ -53,4 +66,12 @@ export class LineUpSettings {
   rowPadding: number;
   groupHeight: number;
   groupPadding: number;
+}
+
+
+/**
+ *
+*/
+export class DumpSettings {
+  public dump: string = "";
 }
