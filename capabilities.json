@@ -11,7 +11,17 @@
             "kind": "Measure"
         }
     ],
-    "objects": { },
+    "objects": {
+      "dumpObject": {
+        "displayName": "dumpObject",
+        "properties": {
+          "dumpProperty": {
+            "displayName": "dump",
+            "type": { "text": true }
+          }
+        }
+      }
+    },
     "supportsHighlight": true,
     "advancedEditModeSupport": 2,
     "sorting": {
